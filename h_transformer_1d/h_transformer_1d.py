@@ -148,17 +148,15 @@ class HAttention1D(nn.Module):
         b, n, h, device, bsz, eps = *x.shape[:2], self.heads, x.device, self.block_size, self.eps
 
         # pad sequence length to power of 2
-
         pad_to_len = 2 ** ceil(log2(n))
         padding = pad_to_len - n
-
         if padding != 0:
             x = F.pad(x, (0, 0, 0, padding), value = 0.)
             if exists(mask):
                 mask = F.pad(mask, (0, padding), value = False)
 
         # derive queries, keys, values
-        q, k, v = self.to_qkv(x).chunk(3, dim = -1)
+        q, k, v = self.to_qkv(x).chunk(3, dim = -1) #(b,n,d)
 
         # split out heads, and also divide sequence into blocks
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h = h), (q, k, v))
@@ -166,23 +164,19 @@ class HAttention1D(nn.Module):
             mask = repeat(mask, 'b n -> (b h) n', h = h)
 
         # scale
-
         q = q * self.scale
 
         # rotary pos emb
-
         if exists(self.pos_emb):
             freqs = self.pos_emb(torch.arange(pad_to_len, device = device), cache_key = pad_to_len)
             freqs = rearrange(freqs, 'n d -> () n d')
             q, k, v = map(lambda t: apply_rotary_emb(freqs, t), (q, k, v))
 
         # calculate number of levels until 2 x 2
-
         num_levels = int(log2(pad_to_len // bsz)) - 2
         assert num_levels >= 0, 'number of levels must be at least greater than 0'
 
         # coarsening
-
         qkvs = [(q, k, v, mask)]
 
         for level in range(num_levels):
@@ -198,15 +192,20 @@ class HAttention1D(nn.Module):
             v = masked_aggregate(v, mask, dim = 2, average = False)
 
             if exists(mask):
-                mask = torch.any(mask, dim = 2)
+                mask = torch.any(mask, dim = 2) #(b, n)
 
             coarsened_qkvs = (q, k, v, mask)
             qkvs.append(coarsened_qkvs)
 
+
         qkvs = [qkvs[0], *qkvs]  # duplicate the finest resolution an extra time, for the base diagonal
 
-        # half-attention function
 
+
+
+
+
+        # half-attention function
         def calculate_Y_and_A(q, k, v, mask = None):
             S = einsum('... i d, ... j d -> ... i j', q, k)
 
