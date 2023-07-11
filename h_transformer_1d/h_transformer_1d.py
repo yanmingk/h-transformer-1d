@@ -226,8 +226,9 @@ class HAttention1D(nn.Module):
 
         to_blocks = lambda t: rearrange(t, 'b (n z) ... -> b n z ...', z = bsz)
 
-        # calculate Ys, as in the paper
 
+
+        # calculate Ys, as in the paper
         Ys = []
 
         for ind, (q, k, v, mask) in enumerate(reversed(qkvs)):
@@ -236,7 +237,6 @@ class HAttention1D(nn.Module):
             q, k, v = map(to_blocks, (q, k, v))
 
             # generate the mask for S
-
             S_mask = None
             if exists(mask):
                 mask = to_blocks(mask)
@@ -245,7 +245,6 @@ class HAttention1D(nn.Module):
                 S_mask = rearrange(q_mask, '... n -> ... n ()') * rearrange(k_mask, '... n -> ... () n')
 
             # flip keys and values to capture the off-diagonals
-
             if not is_last:
                 k, v = map(flip_every_two, (k, v))
 
